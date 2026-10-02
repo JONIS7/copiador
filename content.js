@@ -1,21 +1,90 @@
 let config = null;
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === 'copiador:paste-frame') {
+    sendResponse({ pastedCount: pasteDataIntoDocument(message.data) });
+  }
+});
+
+function pasteDataIntoDocument(data) {
+  if (!config || !config.fields) return 0;
+
+  const targetValues = {};
+  config.fields.forEach(field => {
+    const val = data[field.source];
+    if (val !== undefined && val !== '') {
+      if (!targetValues[field.target]) targetValues[field.target] = [];
+      targetValues[field.target].push(val);
+    }
+  });
+
+  let pastedCount = 0;
+  Object.keys(targetValues).forEach(target => {
+    const el = document.querySelector(target);
+    if (!el) return;
+
+    let combinedValue = el.tagName === 'INPUT'
+      ? targetValues[target].join(' - ')
+      : targetValues[target].join('\n');
+
+    if (el.id === 'os' && typeof combinedValue === 'string') {
+      const osNumber = combinedValue.match(/^\s*S?(\d+)\s*\(/i);
+      if (osNumber) combinedValue = osNumber[1];
+    }
+
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        el.checked = combinedValue === 'true' || combinedValue === true;
+      } else {
+        el.value = combinedValue;
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (el.isContentEditable || el.closest('[contenteditable="true"]')) {
+      const editableEl = el.isContentEditable ? el : el.closest('[contenteditable="true"]');
+      editableEl.focus();
+      document.execCommand('selectAll', false, null);
+      document.execCommand('insertText', false, combinedValue);
+    } else {
+      el.innerText = combinedValue;
+    }
+    pastedCount++;
+  });
+
+  return pastedCount;
+}
+
 function makeDraggable(el, storageKey) {
   let isDragging = false;
   let hasDragged = false;
+  let isResizing = false;
   let startX, startY, initialLeft, initialTop;
+  const sizeStorageKey = `${storageKey}_size`;
 
-  // Carrega posição salva anteriormente
-  chrome.storage.local.get([storageKey], (result) => {
+  chrome.storage.local.get([storageKey, sizeStorageKey], (result) => {
     if (result[storageKey]) {
       el.style.left = result[storageKey].left;
       el.style.top = result[storageKey].top;
       el.style.right = 'auto';
       el.style.bottom = 'auto';
     }
+    if (result[sizeStorageKey]) {
+      const savedWidth = Number.parseFloat(result[sizeStorageKey].width);
+      const savedHeight = Number.parseFloat(result[sizeStorageKey].height);
+      const maxWidth = el.id === 'copiador-copy-btn' ? 120 : Infinity;
+      const maxHeight = el.id === 'copiador-copy-btn' ? 32 : Infinity;
+      el.style.width = `${Math.max(64, Math.min(savedWidth || 120, maxWidth))}px`;
+      el.style.height = `${Math.max(22, Math.min(savedHeight || 32, maxHeight))}px`;
+    }
   });
 
   el.addEventListener('mousedown', (e) => {
+    const bounds = el.getBoundingClientRect();
+    if (e.clientX >= bounds.right - 18 && e.clientY >= bounds.bottom - 18) {
+      isResizing = true;
+      return;
+    }
+
     isDragging = true;
     hasDragged = false;
     startX = e.clientX;
@@ -44,6 +113,17 @@ function makeDraggable(el, storageKey) {
   });
 
   document.addEventListener('mouseup', (e) => {
+    if (isResizing) {
+      isResizing = false;
+      chrome.storage.local.set({
+        [sizeStorageKey]: {
+          width: `${el.offsetWidth}px`,
+          height: `${el.offsetHeight}px`
+        }
+      });
+      return;
+    }
+
     if (isDragging) {
       isDragging = false;
       el.style.cursor = 'grab';
@@ -55,13 +135,6 @@ function makeDraggable(el, storageKey) {
     }
   });
 
-  // Intercepta o clique para não disparar a ação do botão se o usuário estava apenas arrastando
-  el.addEventListener('click', (e) => {
-    if (hasDragged) {
-      e.stopImmediatePropagation();
-      e.preventDefault();
-    }
-  }, true); // Captura o evento antes do clique real do botão
 }
 function checkUrlAndInject() {
   const currentUrl = window.location.href;
@@ -93,44 +166,59 @@ function checkUrlAndInject() {
 function injectCopyButton() {
   if (document.getElementById('copiador-copy-btn')) return;
 
-  const btn = document.createElement('button');
+  const btn = document.createElement('div');
   btn.id = 'copiador-copy-btn';
   btn.className = 'copiador-btn';
-  btn.innerText = 'Copiar Dados (Extensão)';
-  
-  btn.addEventListener('click', () => {
+  btn.setAttribute('role', 'status');
+  btn.setAttribute('aria-live', 'polite');
+  btn.innerText = 'Aguardando dados';
+
+  const copySourceData = () => {
     if (!config || !config.fields) return;
 
     const dataToCopy = {};
-    let copiedCount = 0;
     config.fields.forEach(field => {
       const el = document.querySelector(field.source);
       if (el) {
-        // Handle input vs text element
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
           if (el.type === 'checkbox' || el.type === 'radio') {
-             dataToCopy[field.source] = el.checked;
+            dataToCopy[field.source] = el.checked;
           } else {
-             dataToCopy[field.source] = el.value;
+            dataToCopy[field.source] = el.value;
           }
         } else {
           dataToCopy[field.source] = el.innerText || el.textContent;
         }
-        copiedCount++;
-      } else {
-         console.warn("Copiador: Seletor não encontrado:", field.source);
       }
     });
 
+    const copiedCount = Object.keys(dataToCopy).length;
+    if (copiedCount === 0) return;
+
     chrome.storage.local.set({ copiedData: dataToCopy }, () => {
-      alert(`Dados de ${copiedCount} campo(s) copiados com sucesso!`);
+        const status = `${copiedCount} ${copiedCount === 1 ? 'dado copiado' : 'dados copiados'}`;
+        if (btn.innerText !== status) btn.innerText = status;
     });
-  });
+  };
 
   document.body.appendChild(btn);
-
-  // Torna o botão arrastável pelo usuário
   makeDraggable(btn, 'copiador_pos_copy');
+
+  let copyTimer;
+  const scheduleCopy = () => {
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(copySourceData, 150);
+  };
+
+  document.addEventListener('input', scheduleCopy, true);
+  document.addEventListener('change', scheduleCopy, true);
+  new MutationObserver(records => {
+    if (records.some(record => !btn.contains(record.target) && record.target !== btn)) {
+      scheduleCopy();
+    }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+
+  scheduleCopy();
 }
 
 function injectPasteButton() {
@@ -139,7 +227,7 @@ function injectPasteButton() {
   const btn = document.createElement('button');
   btn.id = 'copiador-paste-btn';
   btn.className = 'copiador-btn paste';
-  btn.innerText = 'Colar Dados (Extensão)';
+  btn.innerText = 'Colar Dados';
   
   btn.addEventListener('click', () => {
     chrome.storage.local.get(['copiedData'], (result) => {
@@ -148,63 +236,16 @@ function injectPasteButton() {
         return;
       }
       
-      const data = result.copiedData;
-      let pastedCount = 0;
-
-      // Agrupa os valores pelo seletor de destino
-      const targetValues = {};
-      config.fields.forEach(field => {
-        const val = data[field.source];
-        if (val !== undefined && val !== "") {
-          if (!targetValues[field.target]) {
-            targetValues[field.target] = [];
-          }
-          targetValues[field.target].push(val);
+      chrome.runtime.sendMessage({
+        type: 'copiador:paste',
+        data: result.copiedData
+      }, (response) => {
+        if (chrome.runtime.lastError || !response || response.pastedCount === 0) {
+          alert('Nenhum campo foi preenchido. Verifique os seletores de destino.');
+          return;
         }
+        alert(`Foram preenchidos ${response.pastedCount} campos!`);
       });
-
-      // Cola os dados agrupados em cada destino
-      Object.keys(targetValues).forEach(target => {
-        const el = document.querySelector(target);
-        if (el) {
-          let combinedValue = '';
-          // Se for um input simples (como barra de busca), junta com um traço. Se for área de texto, usa quebra de linha real.
-          if (el.tagName === 'INPUT') {
-             combinedValue = targetValues[target].join(' - ');
-          } else {
-             combinedValue = targetValues[target].join('\n');
-          }
-
-          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
-            if (el.type === 'checkbox' || el.type === 'radio') {
-                el.checked = combinedValue === 'true' || combinedValue === true;
-            } else {
-                el.value = combinedValue;
-            }
-            // Dispara eventos para frameworks (React, Vue, etc)
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          } else if (el.isContentEditable || el.closest('[contenteditable="true"]')) {
-            // Lida com editores de texto complexos (como o do Twitter)
-            const editableEl = el.isContentEditable ? el : el.closest('[contenteditable="true"]');
-            editableEl.focus();
-            document.execCommand('selectAll', false, null);
-            document.execCommand('insertText', false, combinedValue);
-          } else {
-            // Fallback para divs comuns
-            el.innerText = combinedValue;
-          }
-          pastedCount++;
-        } else {
-           console.warn("Copiador: Seletor não encontrado:", target);
-        }
-      });
-      
-      if (pastedCount > 0) {
-        alert(`Foram preenchidos ${pastedCount} campos!`);
-      } else {
-        alert('Nenhum campo foi preenchido. Verifique os seletores de destino.');
-      }
     });
   });
 

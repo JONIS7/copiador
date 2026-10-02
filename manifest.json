@@ -5,7 +5,8 @@
   "description": "Copia dados de um formulário em um site e cola em outro.",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -17,7 +18,11 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["content.css"]
+      "css": ["content.css"],
+      "all_frames": true
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }
