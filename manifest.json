@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Copiador de Formulários",
+  "version": "1.0",
+  "description": "Copia dados de um formulário em um site e cola em outro.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ]
+}

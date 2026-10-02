@@ -1,0 +1,30 @@
+.copiador-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999999;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: grab;
+  user-select: none;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  font-family: sans-serif;
+  transition: background-color 0.3s;
+}
+.copiador-btn:active {
+  cursor: grabbing;
+}
+.copiador-btn:hover {
+  background-color: #1976D2;
+}
+.copiador-btn.paste {
+  background-color: #ff9800;
+}
+.copiador-btn.paste:hover {
+  background-color: #e68a00;
+}

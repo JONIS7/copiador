@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Configurar Copiador</title>
+  <style>
+    body { font-family: sans-serif; padding: 10px; width: 350px; }
+    h3 { margin-top: 0; }
+    label { display: block; margin-top: 10px; font-weight: bold; font-size: 13px; }
+    input[type="text"] { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 5px; }
+    .field-map { border: 1px solid #ccc; padding: 10px; margin-top: 10px; border-radius: 4px; background: #f9f9f9; }
+    .field-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .field-row input { flex: 1; }
+    button { margin-top: 10px; padding: 8px 12px; cursor: pointer; border-radius: 4px; }
+    #saveBtn { background: #4CAF50; color: white; border: none; width: 100%; font-size: 16px; margin-top: 20px;}
+    .remove-btn { background: #f44336; color: white; border: none; cursor: pointer; width: 100%; }
+    .info { font-size: 12px; color: #666; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h3>Configurações do Copiador</h3>
+  
+  <label>Site 1 (Origem)</label>
+  <div class="info">Ex: "meussite.com/origem" (onde o botão de copiar vai aparecer)</div>
+  <input type="text" id="site1" placeholder="URL ou parte dela">
+  
+  <label>Site 2 (Destino)</label>
+  <div class="info">Ex: "meussite.com/destino" (onde o botão de colar vai aparecer)</div>
+  <input type="text" id="site2" placeholder="URL ou parte dela">
+  
+  <label>Mapeamento de Campos (Seletores CSS)</label>
+  <div class="info">Use seletores como #id_do_campo, .classe_do_campo ou name="nome"</div>
+  <div id="fieldsContainer"></div>
+  
+  <button id="addFieldBtn">+ Adicionar Campo</button>
+  
+  <button id="saveBtn">Salvar Configurações</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
