@@ -27,6 +27,12 @@ function pasteDataIntoDocument(data) {
       ? targetValues[target].join(' - ')
       : targetValues[target].join('\n');
 
+    const isAcervoField = el.id === 'acervo'
+      || /acervo/i.test(el.getAttribute('placeholder') || '');
+    if (isAcervoField && typeof combinedValue === 'string') {
+      combinedValue = combinedValue.replace(/\D/g, '');
+    }
+
     if (el.id === 'os' && typeof combinedValue === 'string') {
       const osNumber = combinedValue.match(/^\s*S?(\d+)\s*\(/i);
       if (osNumber) combinedValue = osNumber[1];
