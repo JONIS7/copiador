@@ -12,6 +12,8 @@
     .field-row { display: flex; gap: 10px; margin-bottom: 10px; }
     .field-row input { flex: 1; }
     button { margin-top: 10px; padding: 8px 12px; cursor: pointer; border-radius: 4px; }
+    .config-actions { display: flex; gap: 8px; }
+    .config-actions button { flex: 1; }
     #saveBtn { background: #4CAF50; color: white; border: none; width: 100%; font-size: 16px; margin-top: 20px;}
     .remove-btn { background: #f44336; color: white; border: none; cursor: pointer; width: 100%; }
     .info { font-size: 12px; color: #666; margin-bottom: 10px; }
@@ -33,6 +35,12 @@
   <div id="fieldsContainer"></div>
   
   <button id="addFieldBtn">+ Adicionar Campo</button>
+
+  <div class="config-actions">
+    <button id="exportConfigBtn" type="button">Exportar Configuração</button>
+    <button id="importConfigBtn" type="button">Importar Configuração</button>
+  </div>
+  <input type="file" id="importConfigFile" accept="application/json,.json" hidden>
   
   <button id="saveBtn">Salvar Configurações</button>
 

@@ -41,10 +41,14 @@ function pasteDataIntoDocument(data) {
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
       if (el.type === 'checkbox' || el.type === 'radio') {
         el.checked = combinedValue === 'true' || combinedValue === true;
+      } else if (isAcervoField && el.tagName === 'INPUT') {
+        typeValueIntoInput(el, combinedValue);
       } else {
         el.value = combinedValue;
       }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (!isAcervoField) {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       el.dispatchEvent(new Event('change', { bubbles: true }));
     } else if (el.isContentEditable || el.closest('[contenteditable="true"]')) {
       const editableEl = el.isContentEditable ? el : el.closest('[contenteditable="true"]');
@@ -58,6 +62,47 @@ function pasteDataIntoDocument(data) {
   });
 
   return pastedCount;
+}
+
+function typeValueIntoInput(input, value) {
+  input.focus();
+  input.select();
+
+  const valueSetter = Object.getOwnPropertyDescriptor(
+    Object.getPrototypeOf(input),
+    'value'
+  )?.set;
+
+  let typedValue = '';
+  Array.from(String(value)).forEach(character => {
+    const keyCode = character.charCodeAt(0);
+    const keyboardOptions = {
+      key: character,
+      code: /^\d$/.test(character) ? `Digit${character}` : '',
+      keyCode,
+      which: keyCode,
+      bubbles: true
+    };
+
+    input.dispatchEvent(new KeyboardEvent('keydown', keyboardOptions));
+    input.dispatchEvent(new KeyboardEvent('keypress', keyboardOptions));
+    input.dispatchEvent(new InputEvent('beforeinput', {
+      bubbles: true,
+      data: character,
+      inputType: 'insertText'
+    }));
+
+    typedValue += character;
+    if (valueSetter) valueSetter.call(input, typedValue);
+    else input.value = typedValue;
+
+    input.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      data: character,
+      inputType: 'insertText'
+    }));
+    input.dispatchEvent(new KeyboardEvent('keyup', keyboardOptions));
+  });
 }
 
 function makeDraggable(el, storageKey) {

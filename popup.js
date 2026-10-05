@@ -4,17 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const fieldsContainer = document.getElementById('fieldsContainer');
   const addFieldBtn = document.getElementById('addFieldBtn');
   const saveBtn = document.getElementById('saveBtn');
+  const exportConfigBtn = document.getElementById('exportConfigBtn');
+  const importConfigBtn = document.getElementById('importConfigBtn');
+  const importConfigFile = document.getElementById('importConfigFile');
 
-  // Load saved config
   chrome.storage.local.get(['config'], (result) => {
     if (result.config) {
-      site1Input.value = result.config.site1 || '';
-      site2Input.value = result.config.site2 || '';
-      if (result.config.fields && result.config.fields.length > 0) {
-        result.config.fields.forEach(f => addFieldRow(f.source, f.target));
-      } else {
-        addFieldRow('', '');
-      }
+      loadConfigIntoForm(result.config);
     } else {
       addFieldRow('', '');
     }
@@ -47,6 +43,17 @@ document.addEventListener('DOMContentLoaded', () => {
     fieldsContainer.appendChild(div);
   }
 
+  function loadConfigIntoForm(config) {
+    site1Input.value = config.site1 || '';
+    site2Input.value = config.site2 || '';
+    fieldsContainer.replaceChildren();
+    if (config.fields && config.fields.length > 0) {
+      config.fields.forEach(field => addFieldRow(field.source, field.target));
+    } else {
+      addFieldRow('', '');
+    }
+  }
+
   addFieldBtn.addEventListener('click', () => {
     addFieldRow('', '');
   });
@@ -70,5 +77,57 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.set({ config }, () => {
       alert('Configurações salvas!');
     });
+  });
+
+  exportConfigBtn.addEventListener('click', () => {
+    chrome.storage.local.get(['config'], result => {
+      if (!result.config) {
+        alert('Não há configurações salvas para exportar.');
+        return;
+      }
+
+      const configFile = new Blob([JSON.stringify(result.config, null, 2)], {
+        type: 'application/json'
+      });
+      const downloadUrl = URL.createObjectURL(configFile);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = 'copiador-config.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    });
+  });
+
+  importConfigBtn.addEventListener('click', () => importConfigFile.click());
+
+  importConfigFile.addEventListener('change', async () => {
+    const file = importConfigFile.files[0];
+    if (!file) return;
+
+    try {
+      const importedConfig = JSON.parse(await file.text());
+      const isValidConfig = importedConfig
+        && typeof importedConfig.site1 === 'string'
+        && typeof importedConfig.site2 === 'string'
+        && Array.isArray(importedConfig.fields)
+        && importedConfig.fields.every(field =>
+          field
+          && typeof field.source === 'string'
+          && typeof field.target === 'string'
+        );
+
+      if (!isValidConfig) {
+        throw new Error('Formato de configuração inválido.');
+      }
+
+      chrome.storage.local.set({ config: importedConfig }, () => {
+        loadConfigIntoForm(importedConfig);
+        alert('Configurações importadas e salvas!');
+      });
+    } catch (error) {
+      alert(`Não foi possível importar o arquivo: ${error.message}`);
+    } finally {
+      importConfigFile.value = '';
+    }
   });
 });
