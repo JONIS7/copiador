@@ -35,3 +35,10 @@
 .copiador-btn.paste:hover {
   background-color: #e68a00;
 }
+.copiador-btn.lider {
+  top: 60px;
+  background-color: #1769aa;
+}
+.copiador-btn.lider:hover {
+  background-color: #12558a;
+}

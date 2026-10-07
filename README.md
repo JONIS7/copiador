@@ -20,3 +20,11 @@ Uma extensão para o Google Chrome que permite copiar dados de um formulário em
 4. Clique em **Salvar Configurações**.
 5. **Copiar**: Acesse o Site 1 e clique no botão azul "Copiar Dados (Extensão)" que aparecerá flutuante no canto superior direito.
 6. **Colar**: Acesse o Site 2 e clique no botão laranja "Colar Dados (Extensão)" que aparecerá para preencher o formulário automaticamente.
+
+## Dados recorrentes do Lider chamados
+
+1. Abra o popup da extensão e clique em **Lider chamados**.
+2. Revise os dados recorrentes e clique em **Salvar dados recorrentes**.
+3. No portal `portal.syncplatform.com.br/LIDER_NOTEBOOKS/anonymous-ticket`, selecione o serviço e clique em **Preencher Lider chamados**.
+
+O botão preenche apenas os campos vazios e mantém os valores já preenchidos. Os dados recorrentes são armazenados localmente, separados do mapeamento de campos do copiador.

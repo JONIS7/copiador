@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fieldsContainer = document.getElementById('fieldsContainer');
   const addFieldBtn = document.getElementById('addFieldBtn');
   const saveBtn = document.getElementById('saveBtn');
+  const liderSettingsBtn = document.getElementById('liderSettingsBtn');
   const exportConfigBtn = document.getElementById('exportConfigBtn');
   const importConfigBtn = document.getElementById('importConfigBtn');
   const importConfigFile = document.getElementById('importConfigFile');
@@ -58,6 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
     addFieldRow('', '');
   });
 
+  liderSettingsBtn.addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('lider.html') });
+  });
+
   saveBtn.addEventListener('click', () => {
     const fields = [];
     document.querySelectorAll('.field-map').forEach(row => {
@@ -80,13 +85,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   exportConfigBtn.addEventListener('click', () => {
-    chrome.storage.local.get(['config'], result => {
-      if (!result.config) {
+    chrome.storage.local.get(['config', 'liderProfile'], result => {
+      if (!result.config && !result.liderProfile) {
         alert('Não há configurações salvas para exportar.');
         return;
       }
 
-      const configFile = new Blob([JSON.stringify(result.config, null, 2)], {
+      const backup = {
+        version: 2,
+        config: result.config || null,
+        liderProfile: result.liderProfile || null
+      };
+      const configFile = new Blob([JSON.stringify(backup, null, 2)], {
         type: 'application/json'
       });
       const downloadUrl = URL.createObjectURL(configFile);
@@ -105,23 +115,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!file) return;
 
     try {
-      const importedConfig = JSON.parse(await file.text());
-      const isValidConfig = importedConfig
-        && typeof importedConfig.site1 === 'string'
-        && typeof importedConfig.site2 === 'string'
-        && Array.isArray(importedConfig.fields)
-        && importedConfig.fields.every(field =>
+      const importedData = JSON.parse(await file.text());
+      const isValidConfig = value => value
+        && typeof value.site1 === 'string'
+        && typeof value.site2 === 'string'
+        && Array.isArray(value.fields)
+        && value.fields.every(field =>
           field
           && typeof field.source === 'string'
           && typeof field.target === 'string'
         );
+      const isValidProfile = value => value
+        && typeof value === 'object'
+        && !Array.isArray(value)
+        && Object.values(value).every(fieldValue => typeof fieldValue === 'string');
+      const isLegacyConfig = isValidConfig(importedData);
+      const isBackup = importedData
+        && importedData.version === 2
+        && (importedData.config === null || isValidConfig(importedData.config))
+        && (importedData.liderProfile === null || isValidProfile(importedData.liderProfile));
 
-      if (!isValidConfig) {
+      if (!isLegacyConfig && !isBackup) {
         throw new Error('Formato de configuração inválido.');
       }
 
-      chrome.storage.local.set({ config: importedConfig }, () => {
-        loadConfigIntoForm(importedConfig);
+      const importedConfig = isLegacyConfig ? importedData : importedData.config;
+      const valuesToSave = {};
+      if (importedConfig) valuesToSave.config = importedConfig;
+      if (isBackup && importedData.liderProfile) {
+        valuesToSave.liderProfile = importedData.liderProfile;
+      }
+
+      chrome.storage.local.set(valuesToSave, () => {
+        if (importedConfig) loadConfigIntoForm(importedConfig);
         alert('Configurações importadas e salvas!');
       });
     } catch (error) {

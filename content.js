@@ -187,8 +187,24 @@ function makeDraggable(el, storageKey) {
   });
 
 }
+
+function isLiderPortalPage() {
+  return window.location.hostname === 'portal.syncplatform.com.br'
+    && window.location.pathname.startsWith('/LIDER_NOTEBOOKS/anonymous-ticket');
+}
+
 function checkUrlAndInject() {
   const currentUrl = window.location.href;
+  const isLiderPage = isLiderPortalPage();
+  const liderBtn = document.getElementById('copiador-lider-fill-btn');
+
+  if (window.top === window) {
+    if (isLiderPage) {
+      injectLiderFillButton();
+    } else if (liderBtn) {
+      liderBtn.remove();
+    }
+  }
 
   chrome.storage.local.get(['config'], (result) => {
     if (result.config) {
@@ -212,6 +228,70 @@ function checkUrlAndInject() {
       }
     }
   });
+}
+
+function injectLiderFillButton() {
+  if (document.getElementById('copiador-lider-fill-btn')) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'copiador-lider-fill-btn';
+  btn.className = 'copiador-btn lider';
+  btn.type = 'button';
+  btn.innerText = 'Preencher Dados';
+
+  btn.addEventListener('click', () => {
+    chrome.storage.local.get(['liderProfile'], result => {
+      const profile = result.liderProfile;
+      if (!profile) {
+        alert('Configure os dados recorrentes pelo botão Lider chamados na extensão.');
+        return;
+      }
+
+      const fields = [
+        { placeholder: 'Nome Solicitante', key: 'requester' },
+        { placeholder: 'Telefone 1', key: 'phone1' },
+        { placeholder: 'Telefone 2', key: 'phone2' },
+        { placeholder: 'E-mail', key: 'email' },
+        { placeholder: 'Empresa / Órgão', key: 'organization' },
+        { placeholder: 'CNPJ', key: 'cnpj' },
+        { placeholder: 'Nº Nota Fiscal', key: 'invoiceNumber' }
+      ];
+
+      let filledCount = 0;
+      let existingCount = 0;
+      let missingCount = 0;
+
+      fields.forEach(field => {
+        const value = profile[field.key]?.trim();
+        if (!value) return;
+
+        const input = [...document.querySelectorAll('input[placeholder]')]
+          .find(candidate => candidate.placeholder.trim() === field.placeholder);
+        if (!input) {
+          missingCount++;
+          return;
+        }
+        if (input.value.trim()) {
+          existingCount++;
+          return;
+        }
+
+        typeValueIntoInput(input, value);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        filledCount++;
+      });
+
+      if (filledCount === 0 && missingCount === fields.length) {
+        alert('Os campos do chamado ainda não estão disponíveis. Selecione o serviço e tente novamente.');
+        return;
+      }
+
+      alert(`Preenchidos: ${filledCount}. Já preenchidos e mantidos: ${existingCount}. Não encontrados: ${missingCount}.`);
+    });
+  });
+
+  document.body.appendChild(btn);
+  makeDraggable(btn, 'copiador_pos_lider');
 }
 
 function injectCopyButton() {
